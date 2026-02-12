@@ -97,4 +97,4 @@ python numpy_inference_w4.py
 2. 输入文本过短会导致 SmoothQuant 校准样本不足，可增加 `text` 长度。
 3. 请先按顺序运行三个脚本，确保权重与 scales 文件存在。
 4. fp32_model.pth是自行训练的原始 FP32 MiniGPT 模型，量化过程在此模型上运行。
-5. 由于模型是基于tinystories.txt的内容训练的，建议在写prompt时参考tinystories.txt中相关内容以保证内容输出的稳定性。
+5. 由于模型是基于tinystories.txt的内容训练的，建议在写prompt时内容和风格与tinystories.txt内容相似以保证内容输出的稳定性。
