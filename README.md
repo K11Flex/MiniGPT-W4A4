@@ -96,3 +96,4 @@ python numpy_inference_w4.py
 1. NumPy 推理模拟 A4 激活，当前精度为 float32。
 2. 输入文本过短会导致 SmoothQuant 校准样本不足，可增加 `text` 长度。
 3. 请先按顺序运行三个脚本，确保权重与 scales 文件存在。
+4. fp32_model.pth是自行训练的原始 FP32 MiniGPT 模型，量化过程在此模型上运行。
