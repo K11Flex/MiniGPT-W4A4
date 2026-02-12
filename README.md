@@ -24,8 +24,9 @@
 │  ├─ model_w4_sym_g16.npz     # W4 权重量化后的权重
 │  └─ scales_w4_sym_g16.npz    # 每组权重的 scale
 ├─ smoothquant_calibration.py   # SmoothQuant 缩放与激活校准
-├─ quantize_weights.py          # 权重量化（G16 + MSE 最小化）
-└─ numpy_inference.py           # NumPy W4A4 推理 & 文本生成
+├─ quantize_weights_w4_g16.py          # 权重量化（G16 + MSE 最小化）
+├─ numpy_inference_w4.py           # NumPy W4A4 推理 & 文本生成
+└─ download_data.py    #下载tinystories.txt
 ```
 
 ------
