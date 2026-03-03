@@ -15,14 +15,14 @@ def layer_norm(x, g, b, eps=1e-5):
     return g * (x - mean) / np.sqrt(var + eps) + b
 
 
-def matmul_awq_g16(
+def matmul_awq_g8(
         x,
         weight_q,
         s_w_group,
         smooth_scale,
         bias=None,
-        group_size=16,
-        clip_ratio=0.9998,
+        group_size=8,
+        clip_ratio=0.999,
         name=""
 ):
     x = x / smooth_scale
@@ -109,7 +109,7 @@ class NumPyFinalGPT:
                 self.weights[prefix + 'ln_1.bias']
             )
 
-            qkv = matmul_awq_g16(
+            qkv = matmul_awq_g8(
                 x_norm,
                 self.weights[prefix + 'attn.c_attn.weight'],
                 self.w_scales[prefix + 'attn.c_attn.weight'],
@@ -133,7 +133,7 @@ class NumPyFinalGPT:
 
             y = (att @ v).transpose(0, 2, 1, 3).reshape(b, t, self.n_embd)
 
-            y = matmul_awq_g16(
+            y = matmul_awq_g8(
                 y,
                 self.weights[prefix + 'attn.c_proj.weight'],
                 self.w_scales[prefix + 'attn.c_proj.weight'],
@@ -152,7 +152,7 @@ class NumPyFinalGPT:
                 self.weights[prefix + 'ln_2.bias']
             )
 
-            h = matmul_awq_g16(
+            h = matmul_awq_g8(
                 x_norm,
                 self.weights[prefix + 'mlp.c_fc.weight'],
                 self.w_scales[prefix + 'mlp.c_fc.weight'],
@@ -165,7 +165,7 @@ class NumPyFinalGPT:
 
             h = gelu(h)
 
-            y = matmul_awq_g16(
+            y = matmul_awq_g8(
                 h,
                 self.weights[prefix + 'mlp.c_proj.weight'],
                 self.w_scales[prefix + 'mlp.c_proj.weight'],
@@ -221,8 +221,8 @@ class NumPyFinalGPT:
 
 if __name__ == "__main__":
 
-    WEIGHTS_FILE = "weights/model_w4_sym_g16.npz"
-    SCALES_FILE = "weights/scales_w4_sym_g16.npz"
+    WEIGHTS_FILE = "weights/model_w4_sym_g8.npz"
+    SCALES_FILE = "weights/scales_w4_sym_g8.npz"
     VOCAB_FILE = "data/tinystories.txt"
 
     if os.path.exists(WEIGHTS_FILE) and os.path.exists(SCALES_FILE):
@@ -231,7 +231,7 @@ if __name__ == "__main__":
             weights_path=WEIGHTS_FILE,
             scales_path=SCALES_FILE,
             vocab_path=VOCAB_FILE,
-            group_size=16,
+            group_size=8,
             clip_ratio=0.9995
         )
 

@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 
-GROUP_SIZE = 16
+GROUP_SIZE = 8
 
 
 def find_best_mse_scale(group, num_steps=20):
@@ -15,7 +15,7 @@ def find_best_mse_scale(group, num_steps=20):
     best_mse = float('inf')
     best_scale = max_val / 7.0
 
-    for ratio in np.linspace(0.7, 1.0, num_steps):
+    for ratio in np.linspace(0.5, 1.0, num_steps):
         scale = max_val * ratio / 7.0
 
         w_q = np.round(group / scale).clip(-8, 7)
@@ -40,7 +40,7 @@ def run_advanced_quantization():
     weight_scales = {}
     stats = []
 
-    print("=== SmoothQuant + G16-MSE 权重量化 ===")
+    print("=== SmoothQuant + G8-MSE 权重量化 ===")
 
     for key in src_model.files:
 
@@ -98,10 +98,10 @@ def run_advanced_quantization():
     for k, snr, mse in stats:
         print(f"{k:40s} | {snr:6.2f} dB | {mse:.6f}")
 
-    np.savez("weights/model_w4_sym_g16.npz", **quantized_weights)
-    np.savez("weights/scales_w4_sym_g16.npz", **weight_scales)
+    np.savez("weights/model_w4_sym_g8.npz", **quantized_weights)
+    np.savez("weights/scales_w4_sym_g8.npz", **weight_scales)
 
-    print("\n保存完成 G16 权重")
+    print("\n保存完成 G8 权重")
 
 
 if __name__ == "__main__":

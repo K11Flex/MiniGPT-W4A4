@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from src.model import MiniGPT, Config
 
-GROUP_SIZE = 16
+GROUP_SIZE = 8
 CLIP_PERCENTILE = 99.9
 
 
