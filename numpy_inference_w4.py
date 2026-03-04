@@ -2,6 +2,9 @@ import numpy as np
 import os
 
 
+GROUP_SIZE = 8
+
+
 def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
@@ -22,15 +25,29 @@ def matmul_awq_g8(
         smooth_scale,
         bias=None,
         group_size=8,
+        act_group_size=None,
         clip_ratio=0.999,
         name=""
 ):
+    """
+    W4A4 矩阵乘法，支持激活与权重使用不同量化粒度。
+
+    参数:
+        group_size      : 权重量化时使用的 group size（决定 s_w_group 的列数）
+        act_group_size  : 激活量化粒度，默认与 group_size 相同。
+                          设为更小的值（如 4）可提升激活量化精度；
+                          此时权重 scale 会沿 in_features 维度 repeat 展开以对齐粒度。
+    """
+    if act_group_size is None:
+        act_group_size = group_size
+
     x = x / smooth_scale
 
     out_features, in_features = weight_q.shape
-    num_groups = in_features // group_size
 
-    x_group = x.reshape(-1, num_groups, group_size)
+    # ---- 激活量化（按 act_group_size 分组） ----
+    num_act_groups = in_features // act_group_size
+    x_group = x.reshape(-1, num_act_groups, act_group_size)
     abs_x = np.abs(x_group)
 
     thresh = np.percentile(
@@ -39,18 +56,28 @@ def matmul_awq_g8(
         axis=2,
         keepdims=True
     )
-
     thresh = np.maximum(thresh, 1e-6)
     s_a = thresh / 7.0
 
     x_q = np.round(x_group / s_a).clip(-8, 7).astype(np.int8)
     x_deq = (x_q.astype(np.float32) * s_a).reshape(x.shape)
 
-    w_q = weight_q.reshape(out_features, num_groups, group_size)
+    # ---- 权重反量化（将 g8 scale 展开对齐到 act_group_size） ----
+    # s_w_group shape: [out_features, in_features // group_size]
+    # 目标 shape:      [out_features, in_features // act_group_size]
+    repeat_factor = group_size // act_group_size  # e.g. 8//4 = 2
+    if repeat_factor > 1:
+        # [out_c, n_w_groups] -> [out_c, n_w_groups * repeat] = [out_c, n_act_groups]
+        s_w_expanded = np.repeat(s_w_group, repeat_factor, axis=1)
+    else:
+        s_w_expanded = s_w_group  # 粒度相同，无需展开
+
+    num_act_groups_w = in_features // act_group_size
+    w_q = weight_q.reshape(out_features, num_act_groups_w, act_group_size)
 
     w_fp32 = (
             w_q.astype(np.float32)
-            * s_w_group[:, :, None]
+            * s_w_expanded[:, :, None]
     ).reshape(out_features, in_features)
 
     out = x_deq @ w_fp32.T
@@ -109,6 +136,11 @@ class NumPyFinalGPT:
                 self.weights[prefix + 'ln_1.bias']
             )
 
+            # L0 QKV 单独使用 act_group_size=4 以提升激活量化精度
+            # 权重仍为 g8 量化存储，推理时 scale repeat 展开对齐 g4 粒度
+            is_l0_qkv = (i == 0)
+            qkv_act_group_size = 4 if is_l0_qkv else self.group_size
+
             qkv = matmul_awq_g8(
                 x_norm,
                 self.weights[prefix + 'attn.c_attn.weight'],
@@ -116,6 +148,7 @@ class NumPyFinalGPT:
                 smooth_scale=self.weights[prefix + 'attn.c_attn.smooth_scale'],
                 bias=self.weights[prefix + 'attn.c_attn.bias'],
                 group_size=self.group_size,
+                act_group_size=qkv_act_group_size,
                 clip_ratio=self.clip_ratio,
                 name=f"L{i}_Attn_QKV" if debug else ""
             )
