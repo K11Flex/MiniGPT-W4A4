@@ -16,7 +16,6 @@ def percentile_channel(x, percentile=99.9):
 
 
 def get_calibration_data(text, stoi, block_size, num_samples=64):
-    """从全文中随机抽取多个片段作为校准集"""
     data_list = []
     text_len = len(text)
 
@@ -31,11 +30,9 @@ def get_calibration_data(text, stoi, block_size, num_samples=64):
     return torch.stack(data_list)
 
 
-# -------------------------------------------------
+
 # 收集真实激活样本
-# -------------------------------------------------
 def collect_calibration_activations(model, data_samples):
-    """改为处理多样本张量"""
     activations = {}
 
     def hook(name):
@@ -47,7 +44,6 @@ def collect_calibration_activations(model, data_samples):
             if name not in activations:
                 activations[name] = x[:2048]  # 每层初始采样
             else:
-                # 持续累积不同样本的激活特征，最高保留 8192 行以保证统计稳定性
                 activations[name] = np.concatenate(
                     [activations[name], x[:2048]], axis=0
                 )[:8192]
@@ -63,7 +59,7 @@ def collect_calibration_activations(model, data_samples):
     with torch.no_grad():
         # 遍历所有随机抽取的样本
         for i in range(data_samples.shape[0]):
-            x = data_samples[i:i + 1]  # (1, block_size)
+            x = data_samples[i:i + 1]
             model(x)
 
     for h in handles:
@@ -72,9 +68,7 @@ def collect_calibration_activations(model, data_samples):
     return activations
 
 
-# -------------------------------------------------
 # AWQ group quant模拟
-# -------------------------------------------------
 def quantize_weight_awq(W, group_size):
     out_c, in_c = W.shape
     groups = in_c // group_size
@@ -85,9 +79,7 @@ def quantize_weight_awq(W, group_size):
     return Wdq.reshape(out_c, in_c)
 
 
-# -------------------------------------------------
 # Activation quant模拟
-# -------------------------------------------------
 def quantize_activation_awq(X, group_size):
     N, C = X.shape
     groups = C // group_size
@@ -99,12 +91,11 @@ def quantize_activation_awq(X, group_size):
     return Xdq.reshape(N, C)
 
 
-# -------------------------------------------------
-# ⭐⭐⭐ Joint Alpha Search ⭐⭐⭐
-# -------------------------------------------------
+#   Joint Alpha Search
 def search_best_alpha_joint(name, W, X_sample):
     if "h.0.attn.c_attn" in name:
         alpha_candidates = np.linspace(0.8, 0.99, 20)
+        #第一层强制提高alpha
     elif "h.0." in name:
         alpha_candidates = np.linspace(0.4, 0.95, 20)
     else:
@@ -143,9 +134,7 @@ def search_best_alpha_joint(name, W, X_sample):
     return best_alpha, best_scale
 
 
-# -------------------------------------------------
 # 主程序
-# -------------------------------------------------
 if __name__ == "__main__":
     config = Config()
     MODEL_IN = "weights/fp32_model.pth"
@@ -165,7 +154,7 @@ if __name__ == "__main__":
     print("构建随机校准数据集...")
     data_samples = get_calibration_data(full_text, stoi, config.block_size, num_samples=NUM_CALIBRATION_SAMPLES)
 
-    print("收集校准激活（多样化样本）...")
+    print("收集校准激活...")
     act_samples = collect_calibration_activations(model, data_samples)
 
     new_weights = {}
@@ -211,4 +200,4 @@ if __name__ == "__main__":
 
     print("-" * 70)
     np.savez(MODEL_OUT, **new_weights)
-    print(f"\n多样化采样 SmoothQuant 已保存至 {MODEL_OUT}")
+    print(f"\nSmoothQuant 已保存至 {MODEL_OUT}")

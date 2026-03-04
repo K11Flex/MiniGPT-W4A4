@@ -29,15 +29,7 @@ def matmul_awq_g8(
         clip_ratio=0.999,
         name=""
 ):
-    """
-    W4A4 矩阵乘法，支持激活与权重使用不同量化粒度。
 
-    参数:
-        group_size      : 权重量化时使用的 group size（决定 s_w_group 的列数）
-        act_group_size  : 激活量化粒度，默认与 group_size 相同。
-                          设为更小的值（如 4）可提升激活量化精度；
-                          此时权重 scale 会沿 in_features 维度 repeat 展开以对齐粒度。
-    """
     if act_group_size is None:
         act_group_size = group_size
 
@@ -45,7 +37,7 @@ def matmul_awq_g8(
 
     out_features, in_features = weight_q.shape
 
-    # ---- 激活量化（按 act_group_size 分组） ----
+    # 激活量化（按 act_group_size 分组）
     num_act_groups = in_features // act_group_size
     x_group = x.reshape(-1, num_act_groups, act_group_size)
     abs_x = np.abs(x_group)
@@ -62,12 +54,9 @@ def matmul_awq_g8(
     x_q = np.round(x_group / s_a).clip(-8, 7).astype(np.int8)
     x_deq = (x_q.astype(np.float32) * s_a).reshape(x.shape)
 
-    # ---- 权重反量化（将 g8 scale 展开对齐到 act_group_size） ----
-    # s_w_group shape: [out_features, in_features // group_size]
-    # 目标 shape:      [out_features, in_features // act_group_size]
-    repeat_factor = group_size // act_group_size  # e.g. 8//4 = 2
+
+    repeat_factor = group_size // act_group_size
     if repeat_factor > 1:
-        # [out_c, n_w_groups] -> [out_c, n_w_groups * repeat] = [out_c, n_act_groups]
         s_w_expanded = np.repeat(s_w_group, repeat_factor, axis=1)
     else:
         s_w_expanded = s_w_group  # 粒度相同，无需展开
@@ -277,7 +266,7 @@ if __name__ == "__main__":
             if prompt.strip().lower() == "exit":
                 break
 
-            engine.generate(prompt, max_new_tokens=100, temperature=0.25)
+            engine.generate(prompt, max_new_tokens=150, temperature=0.25)
 
     else:
         print("错误：未找到量化权重或 Scale 文件")
