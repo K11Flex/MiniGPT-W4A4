@@ -93,3 +93,4 @@ python numpy_inference.py
 1. NumPy 推理模拟 A4 激活，当前精度为 float32。
 2. 输入文本过短会导致 SmoothQuant 校准样本不足，可增加 `text` 长度。
 3. 请先按顺序运行三个脚本，确保权重与 scales 文件存在。
+4. 为了确保模型的一致性，prompt的内容请尽量参考tinystory.txt文档中的内容
